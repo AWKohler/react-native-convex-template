@@ -3,41 +3,16 @@
     "name": "Convex Mobile Template",
     "slug": "convex-mobile-template",
     "version": "1.0.0",
-    "assetBundlePatterns": [
-      "**/*"
-    ],
-    "ios": {
-      "supportsTabletMode": true,
-      "bundleIdentifier": "com.convextemplate.mobile"
-    },
-    "android": {
-      "package": "com.convextemplate.mobile",
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
-      }
-    },
+    "orientation": "portrait",
+    "scheme": "convex-mobile",
     "web": {
-      "favicon": "./assets/favicon.png"
+      "bundler": "metro",
+      "output": "single"
     },
-    "plugins": [
-      [
-        "expo-router",
-        {
-          "origin": false
-        }
-      ],
-      [
-        "expo-font",
-        {
-          "fonts": []
-        }
-      ],
-      "expo-dev-client"
-    ],
+    "platforms": ["ios", "android", "web"],
+    "plugins": ["expo-router"],
     "experiments": {
-      "tsconfigPaths": true,
-      "typedRoutes": false
+      "typedRoutes": true
     }
   }
 }

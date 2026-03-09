@@ -1,45 +1,38 @@
 {
-  "name": "react-native-convex-template",
+  "name": "convex-mobile-template",
+  "private": true,
   "version": "0.0.0",
   "main": "expo-router/entry",
-  "private": true,
-  "packageManager": "pnpm@9.0.0",
-  "engines": {
-    "node": ">=18.0.0",
-    "pnpm": ">=8.0.0"
-  },
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "eject": "expo prebuild",
-    "build": "tsc --noEmit"
+    "build:web": "expo export --platform web"
   },
   "dependencies": {
-    "expo": "~52.0.0",
-    "expo-constants": "~16.0.0",
-    "expo-dev-client": "~4.0.0",
-    "expo-font": "~12.0.0",
-    "expo-linking": "~6.1.0",
-    "expo-router": "~3.5.0",
-    "expo-splash-screen": "~0.28.0",
-    "expo-status-bar": "~1.12.0",
-    "react": "^18.3.1",
-    "react-native": "^0.75.4",
-    "react-native-gesture-handler": "~2.16.0",
-    "react-native-screens": "~4.1.0",
-    "react-native-safe-area-context": "~4.10.0",
-    "react-native-web": "~0.19.10",
+    "@babel/runtime": "^7.24.0",
     "convex": "^1.31.4",
-    "react-native-convex": "^1.31.4"
+    "expo": "~52.0.0",
+    "expo-router": "~4.0.0",
+    "expo-status-bar": "~2.0.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "react-native": "0.76.5",
+    "react-native-web": "~0.19.12",
+    "@expo/metro-runtime": "~4.0.0",
+    "react-native-screens": "~3.34.0",
+    "react-native-safe-area-context": "4.12.0"
   },
   "devDependencies": {
-    "@babel/core": "^7.20.0",
-    "@react-native-community/eslint-config": "^3.2.0",
-    "@types/node": "^22.10.2",
-    "@types/react": "^18.3.17",
-    "@types/react-native": "0.75.4",
-    "typescript": "~5.6.2"
+    "@babel/core": "^7.24.0",
+    "@types/react": "~18.3.0",
+    "babel-preset-expo": "~12.0.0",
+    "typescript": "~5.3.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "react-native-screens": "~3.34.0"
+    }
   }
 }

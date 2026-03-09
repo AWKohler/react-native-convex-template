@@ -1,153 +1,123 @@
+import { Platform } from 'react-native';
+
+// ============================================================================
+// DO NOT REMOVE: Debug infrastructure for parent window communication
+// This forwards console logs, errors, and HMR events to the parent IDE.
+// Without this, the agent's getBrowserLog tool will not work.
+// ============================================================================
+
+let initialized = false;
+
 /**
- * Parent Window Communication Module
+ * Initialize parent window communication. Call this as early as possible
+ * (module level in the root layout). Safe to call multiple times — guarded
+ * by a flag so hot reloads won't re-register duplicate listeners.
  *
- * Forwards logs, errors, and app state to parent IDE for monitoring.
- * Adapted from web version to work with React Native.
- *
- * In a React Native WebView or iframe context, this facilitates:
- * - Console log/error forwarding
- * - Error boundary notifications
- * - App lifecycle events
+ * Only active on web (when the app is previewed inside an IDE iframe).
  */
+export function initParentCommunication(): void {
+  if (initialized) return;
+  if (Platform.OS !== 'web') return;
+  if (typeof window === 'undefined') return;
+  initialized = true;
 
-import { NativeModules } from "react-native";
+  // ── Console interception ──────────────────────────────────────────────────
+  const originalConsole = {
+    log: console.log.bind(console),
+    warn: console.warn.bind(console),
+    error: console.error.bind(console),
+  };
 
-const isInFrame = () => {
-  // This will be true if running in an iframe/WebView context
-  // In development, this might not apply; in production it depends on deployment
-  return (
-    typeof window !== "undefined" && (window as any).parent !== window
-  );
-};
-
-export const ParentCommunication = {
-  /**
-   * Send a message to parent window
-   */
-  postMessage: (data: Record<string, any>) => {
-    if (isInFrame()) {
-      try {
-        (window as any).parent.postMessage(data, "*");
-      } catch (e) {
-        console.error("[ParentComm] Failed to post message:", e);
-      }
-    }
-  },
-
-  /**
-   * Forward console.log to parent
-   */
-  forwardLog: (level: "log" | "warn" | "error", ...args: unknown[]) => {
+  const forwardToParent = (level: string, ...args: unknown[]) => {
     try {
-      const message = args
-        .map((a) =>
-          typeof a === "object" ? JSON.stringify(a, null, 2) : String(a)
-        )
-        .join(" ");
-
-      ParentCommunication.postMessage({
-        type: "CONSOLE",
+      window.parent.postMessage({
+        type: 'IFRAME_CONSOLE',
         level,
-        message,
-        timestamp: new Date().toISOString(),
-      });
-    } catch (e) {
-      console.error("[ParentComm] Failed to forward log:", e);
-    }
-  },
-
-  /**
-   * Forward an error to parent (from error boundary or uncaught handler)
-   */
-  forwardError: (error: {
-    message: string;
-    stack?: string;
-    type?: string;
-  }) => {
-    try {
-      ParentCommunication.postMessage({
-        type: "ERROR",
-        message: error.message,
-        stack: error.stack,
-        errorType: error.type || "Unknown",
-        timestamp: new Date().toISOString(),
-      });
-    } catch (e) {
-      console.error("[ParentComm] Failed to forward error:", e);
-    }
-  },
-
-  /**
-   * Signal app ready (loaded and rendered)
-   */
-  signalReady: () => {
-    try {
-      ParentCommunication.postMessage({
-        type: "APP_READY",
-        timestamp: new Date().toISOString(),
-      });
-    } catch (e) {
-      console.error("[ParentComm] Failed to signal ready:", e);
-    }
-  },
-
-  /**
-   * Report app metrics/state
-   */
-  reportMetrics: (metrics: Record<string, any>) => {
-    try {
-      ParentCommunication.postMessage({
-        type: "METRICS",
-        data: metrics,
-        timestamp: new Date().toISOString(),
-      });
-    } catch (e) {
-      console.error("[ParentComm] Failed to report metrics:", e);
-    }
-  },
-};
-
-/**
- * Set up console interception
- */
-export function setupConsoleForwarding() {
-  const originalLog = console.log.bind(console);
-  const originalWarn = console.warn.bind(console);
-  const originalError = console.error.bind(console);
-
-  console.log = (...args) => {
-    originalLog(...args);
-    ParentCommunication.forwardLog("log", ...args);
+        message: args
+          .map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a)))
+          .join(' '),
+      }, '*');
+    } catch {}
   };
 
-  console.warn = (...args) => {
-    originalWarn(...args);
-    ParentCommunication.forwardLog("warn", ...args);
-  };
+  console.log = (...args) => { originalConsole.log(...args); forwardToParent('log', ...args); };
+  console.warn = (...args) => { originalConsole.warn(...args); forwardToParent('warn', ...args); };
+  console.error = (...args) => { originalConsole.error(...args); forwardToParent('error', ...args); };
 
-  console.error = (...args) => {
-    originalError(...args);
-    ParentCommunication.forwardLog("error", ...args);
-  };
+  // ── Uncaught errors ───────────────────────────────────────────────────────
+  window.addEventListener('error', (e) => {
+    window.parent.postMessage({
+      type: 'IFRAME_ERROR',
+      message: e.message,
+      filename: e.filename,
+      lineno: e.lineno,
+      colno: e.colno,
+    }, '*');
+  });
+
+  // ── Unhandled promise rejections ──────────────────────────────────────────
+  window.addEventListener('unhandledrejection', (e) => {
+    window.parent.postMessage({
+      type: 'IFRAME_ERROR',
+      message: 'Unhandled Promise Rejection: ' + String(e.reason),
+    }, '*');
+  });
+
+  // ── Expo / Metro HMR monitoring (webpack-style module.hot) ───────────────
+  // Metro web builds expose module.hot with a status handler API.
+  // Status values: 'idle' | 'check' | 'prepare' | 'ready' | 'dispose' | 'apply' | 'abort' | 'fail'
+  // @ts-ignore
+  if (typeof module !== 'undefined' && module.hot) {
+    // @ts-ignore
+    module.hot.addStatusHandler((status: string) => {
+      window.parent.postMessage({ type: 'EXPO_HMR', event: status }, '*');
+    });
+    window.parent.postMessage({ type: 'EXPO_HMR', event: 'hmrModuleLoaded' }, '*');
+  } else {
+    window.parent.postMessage({ type: 'EXPO_HMR', event: 'hmrNotAvailable' }, '*');
+  }
 }
 
 /**
- * Set up global error handlers
+ * Capture the full rendered HTML and send it to the parent IDE for thumbnail
+ * generation. Fires 500 ms after the window load event so React has painted.
+ *
+ * DO NOT REMOVE: Enables automatic project thumbnail generation.
  */
-export function setupErrorHandlers() {
-  // Handle unhandled promise rejections
-  if (typeof __DEV__ !== "undefined" && __DEV__) {
-    // In development, RN has built-in error handling
-    const originalHandler = ErrorUtils.getGlobalHandler?.();
-    ErrorUtils.setGlobalHandler((error: Error, isFatal: boolean) => {
-      ParentCommunication.forwardError({
-        message: error.message,
-        stack: error.stack,
-        type: isFatal ? "FatalError" : "Error",
-      });
-      if (originalHandler) {
-        originalHandler(error, isFatal);
+export function captureAndSendHtmlSnapshot(): void {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return;
+
+  window.addEventListener('load', () => {
+    console.log('📸 Page loaded, will send HTML snapshot in 500ms...');
+    setTimeout(() => {
+      try {
+        const html = document.documentElement.outerHTML;
+        console.log('📸 Sending HTML snapshot to parent...', html.length, 'bytes');
+        window.parent.postMessage({ type: 'HTML_SNAPSHOT', html }, '*');
+        console.log('✅ HTML snapshot sent!');
+      } catch (e) {
+        console.error('❌ Could not send HTML snapshot:', e);
       }
-    });
-  }
+    }, 500);
+  });
+}
+
+/**
+ * Forward a React error boundary catch to the parent IDE.
+ * Called from ErrorBoundary.componentDidCatch.
+ */
+export function sendReactErrorToParent(
+  message: string,
+  stack: string,
+  componentStack: string,
+): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.parent.postMessage({
+      type: 'REACT_ERROR',
+      message,
+      stack,
+      componentStack,
+    }, '*');
+  } catch {}
 }

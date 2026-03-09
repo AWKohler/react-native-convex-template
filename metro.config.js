@@ -1,12 +1,15 @@
-const { getDefaultConfig } = require("expo/metro-config");
-const path = require("path");
+const { getDefaultConfig } = require('expo/metro-config');
 
 const config = getDefaultConfig(__dirname);
 
-// Add alias support
-config.resolver.extraNodeModules = {
-  "@": path.resolve(__dirname, "src"),
-  "@convex": path.resolve(__dirname, "convex/_generated"),
+// WebContainer environment: disable watchman (not available in WebContainers)
+// Metro will fall back to node file watching
+config.resolver.sourceExts = [...config.resolver.sourceExts];
+
+// Aliases to match tsconfig paths
+config.resolver.alias = {
+  '@': './src',
+  '@convex': './convex/_generated',
 };
 
 module.exports = config;
